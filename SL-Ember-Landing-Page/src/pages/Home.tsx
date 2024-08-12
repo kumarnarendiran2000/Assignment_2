@@ -1,12 +1,22 @@
 import React from 'react';
-import PensionInfo from '../components/Pensioninfo';
+import Rewards from '../components/Rewards';
 
 const Home: React.FC = () => {
   return (
-    <main className="flex-grow flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-bold mb-4">Welcome Andy</h1>
-      <PensionInfo />
-    </main>
+    <div className="bg-white">
+      <div className="relative bg-gray-900 text-white py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="text-4xl font-bold text-left">Welcome Andy</h1>
+        </div>
+      </div>
+      <div className="relative w-full">
+        <div className="absolute inset-x-0 top-0 h-3/5 bg-gray-900 z-0"></div>
+        <div className="absolute inset-x-0 bottom-0 h-2/5 bg-blue-100 z-0"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 py-4">
+          <Rewards />
+        </div>
+      </div>
+    </div>
   );
 };
 
