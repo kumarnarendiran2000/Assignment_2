@@ -1,0 +1,46 @@
+export const extractAuthCodeWrapper = (queryParams: Record<string, string>) => {
+  try {
+    const authCode = queryParams.code;
+    const idToken = queryParams.id_token;
+
+    if (!authCode || !idToken) {
+      throw new Error("Authorization code or ID token is missing");
+    }
+
+    console.log("Authorization Code:", authCode);
+    console.log("ID Token:", idToken);
+
+    return { authCode, idToken };
+  } catch (error) {
+    console.error("Error extracting authorization code and ID token:", error.message);
+    throw new Error("Failed to extract authorization code and ID token.");
+  }
+};
+
+---------🙂
+
+import { Hono } from "hono";
+import { extractAuthCodeWrapper } from "../wrappers/moneyhub/extractAuthCodeWrapper";
+
+const app = new Hono();
+
+app.get("/extractAuthCode", async (c) => {
+  try {
+    // Get query parameters
+    const queryParams = c.req.query();
+
+    // Call the wrapper function
+    const { authCode, idToken } = extractAuthCodeWrapper(queryParams);
+
+    // Log the response or process further if needed
+    return c.text(
+      `Authorization Code and ID Token received successfully:\nAuthorization Code: ${authCode}\nID Token: ${idToken}`,
+      200
+    );
+  } catch (error) {
+    console.error(error.message);
+    return c.text("Failed to extract authorization code and ID token.", 400);
+  }
+});
+
+export default app;
