@@ -1,0 +1,145 @@
+import { AxiosInstance } from "axios";
+import { HTTPException } from "./exceptions";
+import { getMoneyHubFormParams } from "./getMHFormParams";
+
+export function bearerTokenWrapper(
+  moneyHubAxios: AxiosInstance,
+  scope: string,
+  isScoped: boolean
+): Promise<string> {
+  return getMoneyHubFormParams({
+    scope,
+    grant_type: isScoped ? undefined : "client_credentials",
+  })
+    .then((body) =>
+      moneyHubAxios.post("/oidc/token", body, {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      })
+    )
+    .then((response) => {
+      if (!response.data.access_token) {
+        throw new HTTPException(500, {
+          message: "Failed to generate bearer token.",
+        });
+      }
+      return response.data.access_token;
+    })
+    .catch((error) => {
+      if (error.response?.status === 400) {
+        throw new HTTPException(400, {
+          message: error.response.data.message || "Invalid token generation request.",
+        });
+      }
+      throw new HTTPException(500, {
+        message: "Unexpected error during bearer token generation.",
+      });
+    });
+}
+
+-----
+
+import { AxiosInstance } from "axios";
+import { HTTPException } from "./exceptions";
+
+export function userCreationWrapper(
+  moneyHubAxios: AxiosInstance,
+  bearerToken: string
+): Promise<string> {
+  return moneyHubAxios
+    .post(
+      "/users",
+      {}, // Empty body
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${bearerToken}`,
+        },
+      }
+    )
+    .then((response) => {
+      if (!response.data.userId) {
+        throw new HTTPException(500, {
+          message: "Failed to create user. Missing userId in response.",
+        });
+      }
+      return response.data.userId;
+    })
+    .catch((error) => {
+      if (error.response?.status === 400) {
+        throw new HTTPException(400, {
+          message: error.response.data.message || "Invalid user creation request.",
+        });
+      }
+      throw new HTTPException(500, {
+        message: "Unexpected error during user creation.",
+      });
+    });
+}
+
+----
+
+import { AxiosInstance } from "axios";
+import { HTTPException } from "./exceptions";
+import { getMoneyHubFormParams } from "./getMHFormParams";
+import { userCreationWrapper } from "./userCreationWrapper";
+import { bearerTokenWrapper } from "./bearerTokenWrapper";
+
+export function authUriWrapper(
+  moneyHubAxios: AxiosInstance,
+  userId?: string
+): Promise<string> {
+  let finalUserId = userId;
+
+  const userPromise = userId
+    ? Promise.resolve(userId)
+    : bearerTokenWrapper(moneyHubAxios, "user:create", false)
+        .then((bearerToken) => userCreationWrapper(moneyHubAxios, bearerToken))
+        .then((newUserId) => {
+          finalUserId = newUserId;
+          return newUserId;
+        });
+
+  return userPromise
+    .then(() =>
+      getMoneyHubFormParams({
+        sub: finalUserId,
+        scope: "openid id:test accounts:read",
+      })
+    )
+    .then((body) =>
+      moneyHubAxios.post("/oidc/request", body, {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      })
+    )
+    .then((response) => {
+      if (!response.data.request_uri) {
+        throw new HTTPException(500, {
+          message: "Failed to generate authorization URI.",
+        });
+      }
+      return response.data.request_uri;
+    })
+    .catch((error) => {
+      if (error.response?.status === 400) {
+        throw new HTTPException(400, {
+          message: error.response.data.message || "Invalid authorization URI request.",
+        });
+      }
+      throw new HTTPException(500, {
+        message: "Unexpected error during authorization URI generation.",
+      });
+    });
+}
+
+---
+
+import moneyHubAxios from "./axiosConfig";
+import { authUriWrapper } from "./wrappers/authUriWrapper";
+
+export function generateAuthUriService(): Promise<string> {
+  return authUriWrapper(moneyHubAxios)
+    .then((uri) => `${uri}&redirect_uri=https://www.example.com/callback`)
+    .catch((error) => {
+      throw new Error(`Failed to generate authorization URI: ${error.message}`);
+    });
+}
