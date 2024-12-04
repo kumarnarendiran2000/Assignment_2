@@ -201,3 +201,20 @@ export function authUriWrapper(
       });
     });
 }
+
+----
+
+export async function generateAuthUriService(
+  moneyHubAxios: AxiosInstance
+): Promise<string> {
+  return authUriWrapper(moneyHubAxios)
+    .then((uri) => {
+      // Join the generated URI with the authorization endpoint and return
+      const fullUri = `https://identity.moneyhub.co.uk/oidc/auth?request_uri=${uri}`;
+      return fullUri;
+    })
+    .catch((error) => {
+      // Handle errors and throw a descriptive message
+      throw new Error(`Failed to generate authorization URI: ${error.message}`);
+    });
+}
