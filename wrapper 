@@ -143,3 +143,61 @@ export function generateAuthUriService(): Promise<string> {
       throw new Error(`Failed to generate authorization URI: ${error.message}`);
     });
 }
+
+_-----_---_---_---
+
+import { AxiosInstance } from "axios";
+import { HTTPException } from "./exceptions";
+import { getMoneyHubFormParams } from "./getMHFormParams";
+import { userCreationWrapper } from "./userCreationWrapper";
+import { bearerTokenWrapper } from "./bearerTokenWrapper";
+
+export function authUriWrapper(
+  moneyHubAxios: AxiosInstance,
+  userId?: string
+): Promise<string> {
+  let finalUserId = userId;
+
+  const userPromise = userId
+    ? Promise.resolve(userId)
+    : bearerTokenWrapper(moneyHubAxios, "user:create", false)
+        .then((bearerToken) =>
+          userCreationWrapper(moneyHubAxios, bearerToken)
+        )
+        .then((newUserId) => {
+          finalUserId = newUserId;
+          return newUserId;
+        });
+
+  return userPromise
+    .then(() =>
+      getMoneyHubFormParams({
+        sub: finalUserId!,
+        scope: "openid id:test accounts:read",
+      })
+    )
+    .then((body) => {
+      return moneyHubAxios
+        .post("/oidc/request", body, {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        })
+        .then((response) => {
+          if (!response.data.request_uri) {
+            throw new HTTPException(500, {
+              message: "Failed to generate authorization URI.",
+            });
+          }
+          return response.data.request_uri;
+        });
+    })
+    .catch((error) => {
+      if (error.response?.status === 400) {
+        throw new HTTPException(400, {
+          message: error.response.data.message || "Invalid authorization URI request.",
+        });
+      }
+      throw new HTTPException(500, {
+        message: error.message || "Unexpected error during authorization URI generation.",
+      });
+    });
+}
