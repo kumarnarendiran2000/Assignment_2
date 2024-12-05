@@ -1,0 +1,21 @@
+let user: string;
+
+if (userId) {
+  // If userId is provided, use it directly
+  user = userId;
+} else {
+  // If userId is not provided, create a new user
+  await generateClientBearerToken(moneyHubIdentityAxios, {
+    grant_type: "client_credentials",
+    scope: "user:create",
+  })
+    .then((userCreateAccessToken) => {
+      return userCreationWrapper(moneyHubIdentityAxios, userCreateAccessToken);
+    })
+    .then((response) => {
+      user = response; // Assign the created user ID
+    })
+    .catch((error) => {
+      throw new Error(`Failed to create new user: ${error.message}`);
+    });
+}
