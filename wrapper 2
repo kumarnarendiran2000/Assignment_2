@@ -36,3 +36,58 @@ export async function authCodeWrapper(
     throw new Error(`Failed to exchange authorization code: ${error.message}`);
   }
 }
+
+
+------
+
+import { AxiosInstance } from "axios";
+import { SECRETS } from "../config/secrets";
+import { getCommonMoneyHubFormParams } from "../helpers/moneyhub/request-form-params";
+import { decode } from "jsonwebtoken";
+
+export function authCodeExchangeWrapper(
+  moneyHubAxios: AxiosInstance,
+  authCode: string
+): Promise<string> {
+  return getCommonMoneyHubFormParams({
+    grant_type: "authorization_code",
+    code: authCode,
+    redirect_uri: SECRETS.redirect_uri,
+    client_id: SECRETS.moneyHub.client_id,
+  })
+    .then((body) =>
+      moneyHubAxios.post("/oidc/token", body, {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      })
+    )
+    .then((response) => {
+      const idToken = response.data?.id_token;
+
+      if (!idToken) {
+        throw new Error("ID Token is missing in the response.");
+      }
+
+      const payload = JSON.parse(Buffer.from(idToken.split(".")[1], "base64").toString("utf8"));
+      const sub = payload.sub;
+
+      if (!sub) {
+        throw new Error("Unable to extract 'sub' from ID Token.");
+      }
+
+      return sub;
+    })
+    .catch((error) => {
+      const status = error.response?.status;
+      const message = error.response?.data?.message || error.message;
+
+      if (status === 400) {
+        throw new Error(`Invalid Request: ${message}`);
+      } else if (status === 401) {
+        throw new Error(`Unauthorized: ${message}`);
+      } else if (status === 500) {
+        throw new Error(`Server Error: ${message}`);
+      }
+
+      throw new Error(`Failed to exchange authorization code: ${message}`);
+    });
+}
