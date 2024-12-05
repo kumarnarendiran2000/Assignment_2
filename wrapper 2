@@ -1,0 +1,38 @@
+import { AxiosInstance } from "axios";
+import { decode } from "jsonwebtoken";
+import { getCommonMoneyHubFormParams } from "./request-form-params";
+
+export async function authCodeWrapper(
+  moneyHubAxios: AxiosInstance,
+  authCode: string
+): Promise<string> {
+  try {
+    const body = await getCommonMoneyHubFormParams({
+      grant_type: "authorization_code",
+      code: authCode,
+      redirect_uri: "https://www.example.com/callback", // Ensure this matches the redirect URI used before
+    });
+
+    const response = await moneyHubAxios.post("/oidc/token", body, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+
+    const { id_token } = response.data;
+
+    if (!id_token) {
+      throw new Error("ID Token is missing in the response.");
+    }
+
+    const decoded = decode(id_token, { json: true });
+    const sub = decoded?.sub;
+
+    if (!sub) {
+      throw new Error("Unable to extract 'sub' from ID Token.");
+    }
+
+    return sub;
+  } catch (error) {
+    console.error("Error during Auth Code Exchange:", error.message);
+    throw new Error(`Failed to exchange authorization code: ${error.message}`);
+  }
+}
