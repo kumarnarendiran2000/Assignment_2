@@ -1,0 +1,77 @@
+import axios, { type AxiosInstance } from 'axios';
+import { beforeAll, describe, expect, test, vi } from 'vitest';
+import { mockApiAppConfig } from '../../../../testUtils/mocks';
+import { CONFIG } from '../../../../lambdaContext';
+import { createUser } from './createUser';
+
+describe('createUser', () => {
+  let mockMoneyHubIdentityAxios: AxiosInstance;
+
+  beforeAll(() => {
+    // Update CONFIG with mock API configuration
+    CONFIG.updateApiConfig(mockApiAppConfig);
+
+    // Create a mock Axios instance for Moneyhub Identity API
+    mockMoneyHubIdentityAxios = axios.create({
+      baseURL: `${mockApiAppConfig.moneyhub.identityBaseUrl}`,
+    });
+  });
+
+  test('should create a user successfully and return userId', async () => {
+    // Arrange: Mock the response from Moneyhub API
+    const mockResponse = { data: { userId: 'mock-user-id' } };
+    mockMoneyHubIdentityAxios.post = vi.fn().mockResolvedValue(mockResponse);
+
+    // Act: Call the createUser wrapper
+    const userId = await createUser(mockMoneyHubIdentityAxios, 'mock-access-token');
+
+    // Assert: Validate the returned userId and API call behavior
+    expect(userId).toEqual('mock-user-id');
+    expect(mockMoneyHubIdentityAxios.post).toHaveBeenCalledTimes(1);
+    expect(mockMoneyHubIdentityAxios.post).toHaveBeenCalledWith(
+      '/users',
+      {}, // API body
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer mock-access-token`,
+        },
+      }
+    );
+  });
+
+  test('should throw an error if userId is missing in the response', async () => {
+    // Arrange: Mock the response without userId
+    mockMoneyHubIdentityAxios.post = vi.fn().mockResolvedValue({ data: {} });
+
+    // Act & Assert: Expect the wrapper to throw an error
+    await expect(createUser(mockMoneyHubIdentityAxios, 'mock-access-token')).rejects.toThrow(
+      'Failed to create user. Missing userId in response.'
+    );
+  });
+
+  test('should handle HTTP errors gracefully', async () => {
+    // Arrange: Mock an HTTP error response
+    mockMoneyHubIdentityAxios.post = vi.fn().mockRejectedValue({
+      response: {
+        status: 401,
+        data: { error_description: 'Unauthorized' },
+      },
+    });
+
+    // Act & Assert: Expect the wrapper to throw the error description
+    await expect(createUser(mockMoneyHubIdentityAxios, 'mock-access-token')).rejects.toThrow(
+      'Unauthorized'
+    );
+  });
+
+  test('should handle network or unknown errors gracefully', async () => {
+    // Arrange: Mock a network error
+    mockMoneyHubIdentityAxios.post = vi.fn().mockRejectedValue(new Error('Network Error'));
+
+    // Act & Assert: Expect the wrapper to throw a generic error
+    await expect(createUser(mockMoneyHubIdentityAxios, 'mock-access-token')).rejects.toThrow(
+      'Unexpected error during user creation.'
+    );
+  });
+});
