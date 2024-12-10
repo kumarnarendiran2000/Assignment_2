@@ -1,0 +1,57 @@
+import { extractAuthCodeWrapper } from './extractAuthCodeWrapper';
+
+describe('extractAuthCodeWrapper Tests', () => {
+  const validAuthCode = 'valid-auth-code';
+  const validIdToken = 'header.payload.signature';
+  const mockSub = 'mock-sub';
+
+  test('should extract authCode and sub successfully from valid query params', () => {
+    vi.spyOn(Buffer, 'from').mockImplementationOnce(() => ({
+      toString: () => JSON.stringify({ sub: mockSub }),
+    }));
+
+    const queryParams = {
+      code: validAuthCode,
+      id_token: validIdToken,
+    };
+
+    const { authCode, sub } = extractAuthCodeWrapper(queryParams);
+
+    // Assertions
+    expect(authCode).toEqual(validAuthCode);
+    expect(sub).toEqual(mockSub);
+  });
+
+  test('should throw an error if authCode or id_token is missing', () => {
+    const invalidQueryParams = {
+      code: validAuthCode, // Missing id_token
+    };
+
+    expect(() => extractAuthCodeWrapper(invalidQueryParams)).toThrowError(
+      'Authorization code or id_token is missing'
+    );
+
+    const invalidQueryParams2 = {
+      id_token: validIdToken, // Missing code
+    };
+
+    expect(() => extractAuthCodeWrapper(invalidQueryParams2)).toThrowError(
+      'Authorization code or id_token is missing'
+    );
+  });
+
+  test('should throw an error if sub is missing from the id_token', () => {
+    vi.spyOn(Buffer, 'from').mockImplementationOnce(() => ({
+      toString: () => JSON.stringify({}), // No sub in the payload
+    }));
+
+    const queryParams = {
+      code: validAuthCode,
+      id_token: validIdToken,
+    };
+
+    expect(() => extractAuthCodeWrapper(queryParams)).toThrowError(
+      'Unable to extract "sub" from ID Token'
+    );
+  });
+});
