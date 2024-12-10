@@ -55,3 +55,65 @@ describe('extractAuthCodeWrapper Tests', () => {
     );
   });
 });
+
+
+
+import { describe, test, expect } from 'vitest';
+import { extractAuthCodeWrapper } from './extractAuthCode';
+import { Buffer } from 'node:buffer';
+
+describe('extractAuthCodeWrapper', () => {
+  const validAuthCode = 'mockAuthCode';
+  const mockSub = 'mockSub';
+
+  // Prepare a valid id_token with encoded payload
+  const mockPayload = JSON.stringify({ sub: mockSub });
+  const validIdToken = `header.${Buffer.from(mockPayload).toString('base64')}.signature`;
+
+  test('should extract authCode and sub successfully', () => {
+    const queryParams = {
+      code: validAuthCode,
+      id_token: validIdToken,
+    };
+
+    const { authCode, sub } = extractAuthCodeWrapper(queryParams);
+
+    expect(authCode).toEqual(validAuthCode);
+    expect(sub).toEqual(mockSub);
+  });
+
+  test('should throw an error if authCode is missing', () => {
+    const invalidQueryParams = {
+      id_token: validIdToken, // Missing 'code'
+    };
+
+    expect(() => extractAuthCodeWrapper(invalidQueryParams)).toThrowError(
+      'Authorization code or id_token is missing',
+    );
+  });
+
+  test('should throw an error if id_token is missing', () => {
+    const invalidQueryParams = {
+      code: validAuthCode, // Missing 'id_token'
+    };
+
+    expect(() => extractAuthCodeWrapper(invalidQueryParams)).toThrowError(
+      'Authorization code or id_token is missing',
+    );
+  });
+
+  test('should throw an error if sub is missing from the id_token payload', () => {
+    // Create an invalid id_token without 'sub'
+    const invalidPayload = JSON.stringify({});
+    const invalidIdToken = `header.${Buffer.from(invalidPayload).toString('base64')}.signature`;
+
+    const invalidQueryParams = {
+      code: validAuthCode,
+      id_token: invalidIdToken,
+    };
+
+    expect(() => extractAuthCodeWrapper(invalidQueryParams)).toThrowError(
+      'Unable to extract "sub" from ID Token',
+    );
+  });
+});
