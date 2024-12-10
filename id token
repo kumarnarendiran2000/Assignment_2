@@ -1,0 +1,35 @@
+import { HTTPException } from 'hono/http-exception';
+
+/**
+ * Decodes a JWT-style ID token and retrieves a specific field from the payload.
+ *
+ * @param idToken - The JWT string to decode.
+ * @param field - The field to extract from the payload.
+ * @returns The value of the requested field.
+ * @throws HTTPException if the token format is invalid or the field is missing.
+ */
+export async function decodeIdToken(
+  idToken: string,
+  field: string
+): Promise<string> {
+  try {
+    // Split the token into its parts
+    const [header, payload, signature] = idToken.split('.');
+    if (!header || !payload || !signature) {
+      throw new HTTPException(500, { message: 'Invalid authentication token.' });
+    }
+
+    // Decode and parse the payload
+    const decodedPayload = Buffer.from(payload, 'base64').toString('utf-8');
+    const parsedPayload = JSON.parse(decodedPayload);
+
+    // Ensure the field exists
+    if (!(field in parsedPayload)) {
+      throw new HTTPException(500, { message: `Field "${field}" not found in token payload.` });
+    }
+
+    return parsedPayload[field];
+  } catch (error) {
+    throw new HTTPException(500, { message: 'Failed to decode the ID token.' });
+  }
+}
