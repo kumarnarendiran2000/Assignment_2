@@ -1,0 +1,71 @@
+import { describe, test, expect } from 'vitest';
+import { extractAuthCodeWrapper } from './extractAuthCodeWrapper';
+
+describe('extractAuthCodeWrapper tests', () => {
+  test('should successfully extract authorization code, id_token, and subset', async () => {
+    // Arrange
+    const mockHeader = 'dummy-header';
+    const mockPayload = Buffer.from(JSON.stringify({ sub: 'mockSub' })).toString('base64');
+    const mockSignature = 'dummy-signature';
+    const mockIdToken = `${mockHeader}.${mockPayload}.${mockSignature}`;
+
+    const mockQueryParams = {
+      code: 'mockAuthCode',
+      id_token: mockIdToken,
+      subset: 'true',
+    };
+
+    // Act
+    const result = await extractAuthCodeWrapper(mockQueryParams);
+
+    // Assert
+    expect(result).toEqual({
+      authCode: 'mockAuthCode',
+      sub: 'mockSub',
+      subset: true,
+    });
+  });
+
+  test('should throw an error if both authorization code and id_token are missing', async () => {
+    // Arrange
+    const mockQueryParams = {
+      subset: 'true',
+    };
+
+    // Act & Assert
+    await expect(extractAuthCodeWrapper(mockQueryParams)).rejects.toThrow(
+      'Authorization code or id_token is missing'
+    );
+  });
+
+  test('should throw an error if id_token is missing', async () => {
+    // Arrange
+    const mockQueryParams = {
+      code: 'mockAuthCode',
+      subset: 'true',
+    };
+
+    // Act & Assert
+    await expect(extractAuthCodeWrapper(mockQueryParams)).rejects.toThrow(
+      'Authorization code or id_token is missing'
+    );
+  });
+
+  test('should throw an error if authorization code is missing', async () => {
+    // Arrange
+    const mockHeader = 'dummy-header';
+    const mockPayload = Buffer.from(JSON.stringify({ sub: 'mockSub' })).toString('base64');
+    const mockSignature = 'dummy-signature';
+    const mockIdToken = `${mockHeader}.${mockPayload}.${mockSignature}`;
+
+    const mockQueryParams = {
+      id_token: mockIdToken,
+      subset: 'true',
+    };
+
+    // Act & Assert
+    await expect(extractAuthCodeWrapper(mockQueryParams)).rejects.toThrow(
+      'Authorization code or id_token is missing'
+    );
+  });
+});
